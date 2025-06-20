@@ -7,7 +7,8 @@ import { useState, useRef, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import AudioPlayer from '../ui/AudioPlayer';
 import { uploadStoryFile } from '../lib/supabase';
-import { supabase } from '../lib/supabase';
+import { supabase } from '@/lib/supabase';
+import { useSignedFiles } from '@/hooks/useSignedFiles';
 
 interface UploadedFile {
   id: string;
@@ -34,35 +35,41 @@ const StoryDetailPage = () => {
 
   useEffect(() => {
     const fetchStoryFiles = async () => {
+      console.log('--- StoryDetailPage Component:fetchStoryFiles() ---')
       if (!storyId) return;
-      
+
       setIsLoadingFiles(true);
       setFileError(null);
-      
+
       try {
         // First get the file entries from the database
         const { data: fileEntries, error: dbError } = await supabase
           .from('entry_files')
           .select(`
-            file_id,
-            files (
-              id,
-              name,
-              url,
-              type,
-              created_at
-            )
+              file_id,
+              files:files ( id, name, object_path, type, created_at )
           `)
           .eq('journal_entry_id', storyId);
 
         if (dbError) throw dbError;
 
         // Extract file data and set state
-        const files = fileEntries
-          .map(entry => entry.files)
-          .filter(Boolean) as StoredFile[];
-        
-        setStoredFiles(files);
+        // const files = fileEntries
+        //   .map(entry => entry.files)
+        //   .filter(Boolean) as StoredFile[];
+
+        const rawFiles = fileEntries
+          .map(entry => ({
+            id: entry.files.id,
+            name: entry.files.name,
+            object_path: entry.files.object_path,
+            type: entry.files.type,
+            created_at: entry.files.created_at
+          }))
+          .filter(Boolean);
+
+        const { signedFiles: storedFiles, loading: isLoadingFiles } = useSignedFiles(rawFiles);
+        setStoredFiles(signedFiles);
       } catch (err) {
         console.error('Error fetching files:', err);
         setFileError('Failed to load attached files');
@@ -92,7 +99,7 @@ const StoryDetailPage = () => {
             </div>
           )}
           <div className="absolute inset-0 bg-black/50 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-            <a 
+            <a
               href={file.url}
               download
               className="text-white hover:text-neutral-200"
@@ -185,7 +192,7 @@ const StoryDetailPage = () => {
           <span>{fileError}</span>
         </div>
       )}
-      
+
       <div {...getRootProps()} className="border-2 border-dashed border-neutral-200 rounded-lg p-4 text-center hover:border-primary-500 transition-colors cursor-pointer mb-4">
         <input {...getInputProps()} />
         <Upload className="mx-auto mb-2 text-neutral-400" size={24} />

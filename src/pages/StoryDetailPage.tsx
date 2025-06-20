@@ -7,6 +7,18 @@ import { useState, useRef, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import AudioPlayer from '../components/ui/AudioPlayer';
 import { uploadStoryFile } from '../lib/supabase';
+import { getFilesForEntry } from '../lib/entryFiles';
+
+interface FileEntry {
+  file_id: string;
+  files: {
+    id: string;
+    name: string;
+    object_path: string;
+    type: string;
+    created_at: string;
+  };
+}
 
 interface UploadedFile {
   id: string;
@@ -28,11 +40,16 @@ const StoryDetailPage = () => {
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [selectedStoryForLink, setSelectedStoryForLink] = useState<string | null>(null);
   const [linkType, setLinkType] = useState<'continuation' | 'related' | 'response'>('related');
+
+  // TODO: consider extracting this logic into a custom hook like `useEntryFiles(journalEntryId)` for reuse
+  const [files, setFiles] = useState<FileEntry[]>([]);
+
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [linkedStories, setLinkedStories] = useState<any[]>([]);
   const audioRef = useRef<HTMLAudioElement>(null);
+
 
   const { getRootProps, getInputProps, open } = useDropzone({
     accept: {
@@ -115,6 +132,22 @@ const StoryDetailPage = () => {
   }, [uploadedFiles]);
 
   useEffect(() => {
+    async function fetchFiles() {
+      console.log('📦 Running fetchFiles for storyId:', storyId);
+      try {
+        const results = await getFilesForEntry(storyId as string);
+        setFiles(results);
+      } catch (err: any) {
+        setError(err.message);
+      }
+    }
+
+    if (storyId != null) {
+      fetchFiles();
+    }
+  }, [storyId]);
+
+  useEffect(() => {
     // Simulate fetching linked stories
     const fetchLinkedStories = async () => {
       try {
@@ -147,6 +180,8 @@ const StoryDetailPage = () => {
     
     fetchLinkedStories();
   }, []);
+
+
 
   if (!story) {
     return (
@@ -435,6 +470,20 @@ const StoryDetailPage = () => {
               <p className="text-sm text-neutral-600">Drop files here or click Add Files above</p>
               <p className="text-xs text-neutral-400 mt-1">Supports images and PDFs</p>
             </div>
+
+            <div className="mt-4">
+              <h2 className="text-lg font-semibold mb-2">Uploaded Files</h2>
+              {error && <p className="text-red-500">{error}</p>}
+              {files.length === 0 ? (
+                <p className="text-sm text-gray-500">No files uploaded yet.</p>
+              ) : (
+                <ul className="list-disc list-inside text-sm text-gray-700">
+                  {files.map((fileEntry) => (
+                    <li key={fileEntry.file_id}>{fileEntry.files.name}</li>
+                  ))}
+                </ul>
+              )}
+            </div>            
             
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               {uploadedFiles.map((file) => (
