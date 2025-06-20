@@ -23,3 +23,9 @@ dist-ssr
 *.sln
 *.sw?
 .env
+
+## Personal ignores
+# Ignore only PDFs and ZIPs in root
+/*.pdf
+/*.zip
+chat-zip/

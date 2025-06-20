@@ -139,22 +139,14 @@ export async function uploadStoryFile(file: File, storyId: string): Promise<stri
 
     if (uploadError) throw uploadError;
 
-    // Get the public URL
-    const { data: { publicUrl } } = supabase.storage
-      .from('story-files')
-      .getPublicUrl(filePath);
-
-    console.log('File uploaded successfully:', {
-      filePath,
-      publicUrl
-    });
+    console.log('File uploaded successfully: filePath');
 
     // Insert file metadata
     const { data: fileData, error: fileError } = await supabase
       .from('files')
       .insert({
         name: file.name,
-        url: publicUrl,
+        url: filePath,
         type: file.type,
         size: file.size,
         created_by: user.id
@@ -166,7 +158,8 @@ export async function uploadStoryFile(file: File, storyId: string): Promise<stri
 
     console.log('File metadata inserted:', {
       fileId: fileData.id,
-      fileName: fileData.name
+      fileName: fileData.name,
+      url: fileData.url
     });
 
     console.log('DUG:  Linking file to the entry in uploadStoryFile():', {
@@ -190,7 +183,21 @@ export async function uploadStoryFile(file: File, storyId: string): Promise<stri
 
     console.log('File linked to story successfully');
 
-    return publicUrl;
+    const { data, error } = await supabase.storage
+      .from('story-files')
+      .createSignedUrl(filePath, 3600 * 24 * 365 * 10);
+
+    console.log('Signed URL:', {
+      filePath: filePath,
+      signedURL: data?.signedUrl
+    });
+
+    if (error || !data?.signedUrl) {
+      throw error || new Error('No signed URL returned');
+    }
+
+    return data.signedUrl;
+
   } catch (error) {
     console.error('Error uploading file:', error);
     throw new Error('Failed to upload file');
